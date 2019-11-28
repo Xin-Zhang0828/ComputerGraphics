@@ -1,0 +1,110 @@
+#version 330
+
+in vec3 WorldPos, Normal;
+
+out vec4 FragColor;
+
+uniform mat4 view;
+uniform bool isFront;
+
+vec3 lightPos = vec3(-25.0, 5.0, 5.0);
+vec3 viewPos = vec3(-10.0, 5.0, 5.0);
+vec3 objectColor = vec3(0.8, 0.6, 0.0);
+vec3 lightColor = vec3(1.0, 1.0, 1.0);
+
+vec4 diffsegment = vec4(0.1, 0.3, 0.6, 1.0);
+
+void main(){
+	vec3 lightDir = normalize(lightPos - WorldPos);
+	vec3 viewDir = normalize(viewPos - WorldPos);
+
+	float diff = max(dot(lightDir, Normal), 0);
+
+	if (diff < diffsegment.x)
+	{
+		diff = diffsegment.x;
+	}
+	else if (diff < diffsegment.y)
+	{
+		diff = diffsegment.y;
+	}
+	else if (diff < diffsegment.z)
+	{
+		diff = diffsegment.z;
+	}
+	else
+	{
+		diff = diffsegment.w;
+	}
+
+	vec3 reflectDir = normalize(reflect(-lightDir, Normal));
+	vec3 halfDir = normalize(reflectDir + viewDir);
+
+	vec3 tangent_x = cross(vec3(0, 1, 0), viewDir);
+	tangent_x = normalize(tangent_x);
+	vec3 tangent_y = cross(viewDir, tangent_x);
+	tangent_y = normalize(tangent_y);
+
+	//translation
+	halfDir = halfDir+ 0.5 * tangent_x-0.5* tangent_y;
+	halfDir = normalize(halfDir);
+
+			//rotate
+	float xRad = 45 * 3.1415926 / 180.0;
+	mat3 xRotation = mat3(1, 0, 0,
+                          0, cos(xRad), -sin(xRad),
+                          0, sin(xRad), cos(xRad));
+	float yRad =45 * 3.1415926 / 180.0;
+	mat3 yRotation = mat3(cos(yRad), 0, sin(yRad),
+                          0, 1, 0,
+                          -sin(yRad), 0, cos(yRad));
+	float zRad = 45 * 3.1415926 / 180.0;
+	mat3 zRotation = mat3(cos(zRad), -sin(zRad), 0,
+                          sin(zRad), cos(zRad), 0,
+                          0, 0, 1);                             
+	halfDir = zRotation * yRotation * xRotation * halfDir;
+
+	// Scale
+	float x = dot(tangent_x, halfDir);
+	float y = dot(tangent_y, halfDir);
+	halfDir = halfDir + 0.5 * x * tangent_x;
+	halfDir = normalize(halfDir);
+	halfDir = halfDir + 0.5 * y * tangent_y;
+	halfDir = normalize(halfDir);
+
+	//split
+	x = dot(tangent_x, halfDir);
+	y = dot(tangent_y, halfDir);
+	int signX = 1;
+	if (x < 0)
+		signX = -1;
+	int signY = 1;
+	if (y < 0)
+		signY = -1;
+	halfDir = halfDir - 0.15 * signX * tangent_x - 0.15 * signY * tangent_y;
+	halfDir = normalize(halfDir);
+
+	//square
+	x = dot(tangent_x, halfDir);
+	y = dot(tangent_y, halfDir);
+	float sqrThetaX = acos(x);
+	float sqrThetaY = acos(y);
+	float sqrnormX = sin(pow(2 * sqrThetaX, 2.0));
+	float sqrnormY = sin(pow(2 * sqrThetaY, 2.0));
+	halfDir = halfDir - 0.5 * (sqrnormX * x * tangent_x + sqrnormY * y * tangent_y);
+	halfDir = normalize(halfDir);
+
+
+	float spec = pow(max(dot(halfDir, viewDir), 0), 50);
+
+	vec3 ambient = objectColor * 0.4;
+	vec3 diffuse = objectColor * diff;
+	vec3 result = (ambient + diffuse) * lightColor;
+
+	if(!isFront)
+		FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+	else if(spec < 0.6)
+		FragColor = vec4(result, 1.0);
+	else
+		FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+}
